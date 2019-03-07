@@ -17,6 +17,7 @@ import {
 	TouchableOpacity,
 	ActivityIndicator,
 	Alert,
+	Image,
 } from 'react-native';
 import ImagePicker from 'react-native-image-picker';
 import Video from 'react-native-video';
@@ -32,14 +33,21 @@ export default class App extends Component {
 		console.log(NativeModules, 'native');
 		this.state = {
 			videoSourcePath: null,
+			imageSourcePath: null,
 			destinationPath: `/storage/emulated/0/Download/${Math.random()}.mp4`,
+			imageDestinationPath: `/storage/emulated/0/Download/${Math.random()}.jpg`,
 			grayscaleLoading: false,
 			sepiaLoading: false,
 			isFiltered: false,
+			isImageFiltered: false,
 		};
 	}
 
 	pickVideo = () => {
+		this.setState({
+			imageSourcePath: null,
+			imageDestinationPath: `/storage/emulated/0/Download/${Math.random()}.jpg`,
+		});
 		const options = {
 			title: 'Video Picker',
 			mediaType: 'video',
@@ -78,14 +86,54 @@ export default class App extends Component {
 		});
 	};
 
-	execute = (effectCode, effectName) => {
-		if (this.state.videoSourcePath) {
+	pickImage = () => {
+		this.setState({ videoSourcePath: null, destinationPath: `/storage/emulated/0/Download/${Math.random()}.mp4` });
+		const options = {
+			title: 'Video Picker',
+			mediaType: 'image',
+			quality: 0.1,
+			storageOptions: {
+				skipBackup: true,
+				path: 'images',
+			},
+		};
+
+		/**
+		 * The first arg is the options object for customization (it can also be null or omitted for default options),
+		 * The second arg is the callback which sends object: response (more info in the API Reference)
+		 */
+		ImagePicker.showImagePicker(options, response => {
+			console.log('Response = ', response);
+
+			this.setState({ imageSourcePath: response.path });
+
+			if (response.didCancel) {
+				console.log('User cancelled image picker');
+			} else if (response.error) {
+				console.log('ImagePicker Error: ', response.error);
+			} else if (response.customButton) {
+				console.log('User tapped custom button: ', response.customButton);
+			} else {
+				const source = { uri: response.uri };
+
+				// You can also display the image using data:
+				// const source = { uri: 'data:image/jpeg;base64,' + response.data };
+
+				this.setState({
+					avatarSource: source,
+				});
+			}
+		});
+	};
+
+	execute = (effectCode, effectName, mediaType) => {
+		if (this.state.videoSourcePath && mediaType === 'video') {
 			let command = `-i ${
 				this.state.videoSourcePath
 			} -vf colorchannelmixer=${effectCode} -acodec copy -pix_fmt yuv420p ${this.state.destinationPath}`;
 
 			if (effectName === 'grayscale') {
-				this.setState({ grayScaleloading: true });
+				this.setState({ grayscaleLoading: true });
 			} else {
 				this.setState({ sepiaLoading: true });
 			}
@@ -93,11 +141,33 @@ export default class App extends Component {
 				command,
 				err => {
 					console.log(err, 'cmd error');
-					this.setState({ grayScaleloading: false, sepiaLoading: false });
+					this.setState({ grayscaleLoading: false, sepiaLoading: false });
 				},
 				success => {
 					console.log(success, 'cmd succcess', typeof success, 'object');
-					this.setState({ grayScaleloading: false, sepiaLoading: false, isFiltered: true });
+					this.setState({ grayscaleLoading: false, sepiaLoading: false, isFiltered: true });
+				}
+			);
+		} else if (this.state.imageSourcePath && mediaType === 'image') {
+			let command = `-i ${this.state.imageSourcePath} -vf colorchannelmixer=${effectCode} -acodec copy ${
+				this.state.imageDestinationPath
+			}`;
+
+			console.log(command, 'executed command');
+			if (effectName === 'grayscale') {
+				this.setState({ grayscaleLoading: true });
+			} else {
+				this.setState({ sepiaLoading: true });
+			}
+			NativeModules.ToastExample.executeCmd(
+				command,
+				err => {
+					console.log(err, 'cmd error');
+					this.setState({ grayscaleLoading: false, sepiaLoading: false });
+				},
+				success => {
+					console.log(success, 'cmd succcess', typeof success, 'object');
+					this.setState({ grayscaleLoading: false, sepiaLoading: false, isImageFiltered: true });
 				}
 			);
 		} else {
@@ -108,19 +178,37 @@ export default class App extends Component {
 	render() {
 		return (
 			<View style={styles.container}>
-				<TouchableOpacity
-					style={{
-						backgroundColor: 'black',
-						flex: 0.1,
-						alignItems: 'center',
-						justifyContent: 'center',
-					}}
-					onPress={() => this.pickVideo()}
-				>
-					<Text style={{ color: 'white' }}>Pick a video</Text>
-				</TouchableOpacity>
+				<View style={{ flex: 0.1, flexDirection: 'row' }}>
+					<TouchableOpacity
+						style={{
+							backgroundColor: 'black',
+							flex: 0.5,
+							alignItems: 'center',
+							justifyContent: 'center',
+							margin: 10,
+						}}
+						disabled={this.state.grayscaleLoading || this.state.sepiaLoading ? true : false}
+						onPress={() => this.pickVideo()}
+					>
+						<Text style={{ color: 'white' }}>Pick a video</Text>
+					</TouchableOpacity>
+					<TouchableOpacity
+						style={{
+							backgroundColor: 'black',
+							flex: 0.5,
+							alignItems: 'center',
+							justifyContent: 'center',
+							margin: 10,
+						}}
+						disabled={this.state.grayscaleLoading || this.state.sepiaLoading ? true : false}
+						onPress={() => this.pickImage()}
+					>
+						<Text style={{ color: 'white' }}>Pick a Image</Text>
+					</TouchableOpacity>
+				</View>
+
 				<View style={{ flex: 0.3, alignItems: 'center', justifyContent: 'center' }}>
-					{this.state.videoSourcePath && (
+					{this.state.videoSourcePath ? (
 						<Video
 							source={{ uri: this.state.videoSourcePath }}
 							style={{
@@ -129,6 +217,13 @@ export default class App extends Component {
 							}}
 							repeat={true}
 						/>
+					) : (
+						this.state.imageSourcePath && (
+							<Image
+								source={{ uri: `file://${this.state.imageSourcePath}` }}
+								style={{ height: 150, width: 300 }}
+							/>
+						)
 					)}
 				</View>
 				<View style={{ flex: 0.1, flexDirection: 'row' }}>
@@ -140,10 +235,28 @@ export default class App extends Component {
 							justifyContent: 'center',
 							margin: 10,
 						}}
-						onPress={() => this.execute('.3:.4:.3:0:.3:.4:.3:0:.3:.4:.3', 'grayscale')}
-						disabled={this.state.grayScaleloading ? true : false}
+						onPress={() => {
+							this.setState(
+								{
+									destinationPath: `/storage/emulated/0/Download/${Math.random()}.mp4`,
+									imageDestinationPath: `/storage/emulated/0/Download/${Math.random()}.jpg`,
+									grayscaleLoading: false,
+									sepiaLoading: false,
+									isFiltered: false,
+									isImageFiltered: false,
+								},
+								() => {
+									this.execute(
+										'.3:.4:.3:0:.3:.4:.3:0:.3:.4:.3',
+										'grayscale',
+										this.state.imageSourcePath ? 'image' : 'video'
+									);
+								}
+							);
+						}}
+						disabled={this.state.grayscaleLoading || this.state.sepiaLoading ? true : false}
 					>
-						{this.state.grayScaleloading ? (
+						{this.state.grayscaleLoading ? (
 							<ActivityIndicator color="white" />
 						) : (
 							<Text style={{ color: 'white' }}>Grayscale filter</Text>
@@ -157,8 +270,25 @@ export default class App extends Component {
 							justifyContent: 'center',
 							margin: 10,
 						}}
-						onPress={() => this.execute('.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131', 'sepia')}
-						disabled={this.state.sepiaLoading ? true : false}
+						onPress={() =>
+							this.setState(
+								{
+									destinationPath: `/storage/emulated/0/Download/${Math.random()}.mp4`,
+									imageDestinationPath: `/storage/emulated/0/Download/${Math.random()}.jpg`,
+									grayscaleLoading: false,
+									sepiaLoading: false,
+									isFiltered: false,
+									isImageFiltered: false,
+								},
+								() =>
+									this.execute(
+										'.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131',
+										'sepia',
+										this.state.imageSourcePath ? 'image' : 'video'
+									)
+							)
+						}
+						disabled={this.state.sepiaLoading || this.state.grayscaleLoading ? true : false}
 					>
 						{this.state.sepiaLoading ? (
 							<ActivityIndicator color="white" />
@@ -169,7 +299,7 @@ export default class App extends Component {
 				</View>
 
 				<View style={{ flex: 0.3, alignItems: 'center', justifyContent: 'center' }}>
-					{this.state.isFiltered && (
+					{this.state.isFiltered ? (
 						<Video
 							source={{ uri: this.state.destinationPath }}
 							style={{
@@ -178,6 +308,13 @@ export default class App extends Component {
 							}}
 							repeat={true}
 						/>
+					) : (
+						this.state.isImageFiltered && (
+							<Image
+								source={{ uri: `file://${this.state.imageDestinationPath}` }}
+								style={{ height: 150, width: 300 }}
+							/>
+						)
 					)}
 				</View>
 			</View>

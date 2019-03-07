@@ -79,7 +79,7 @@ public class ToastModule extends ReactContextBaseJavaModule {
                     public void onSuccess(String s) {
                         // FFmpeg command successfully executed
                         // desc.setText(s);
-                        Toast.makeText(getReactApplicationContext(), "success ffmpeg" + s, Toast.LENGTH_SHORT).show();
+                        // Toast.makeText(getReactApplicationContext(), "success ffmpeg" + s, Toast.LENGTH_SHORT).show();
                         successCallback.invoke(s);
 
                     }
@@ -88,7 +88,7 @@ public class ToastModule extends ReactContextBaseJavaModule {
                     public void onFailure(String s) {
                         // FFmpeg command fail to execute
                         // desc.setText(s);
-                        Toast.makeText(getReactApplicationContext(), "failure ffmpeg" + s, Toast.LENGTH_SHORT).show();
+                        // Toast.makeText(getReactApplicationContext(), "failure ffmpeg" + s, Toast.LENGTH_SHORT).show();
                         errorCallback.invoke(s);
 
                     }
